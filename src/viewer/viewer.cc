@@ -26,6 +26,8 @@ void Viewer::Run() {
                                                  true);
   pangolin::Var<bool> menu_draw_estimate_pose("menu.DrawEstimatedTruth", true,
                                               true);
+  pangolin::Var<bool> menu_draw_initial_pose("menu.DrawInitialPose", true,
+                                             true);
 
   pangolin::OpenGlRenderState s_cam(
       pangolin::ProjectionMatrix(1024, 768, mViewpointF, mViewpointF, 512, 389,
@@ -40,8 +42,9 @@ void Viewer::Run() {
           .SetHandler(new pangolin::Handler3D(s_cam));
 
   Eigen::Matrix4d m;
-  m << 0.426076, 0.386411, -0.818013, -0.594835, 0.686786, -0.726717, 0.014439,
-      -0.733795, -0.588884, -0.567952, -0.575018, -12.149, 0, 0, 0, 1;
+  m << -0.0612103, -0.216861, 0.974281, -0.873631, -0.407822, -0.885482,
+      -0.222717, -0.760422, 0.911007, -0.410967, -0.0342404, -31.595, 0, 0, 0,
+      1;
   pangolin::OpenGlMatrix om(m);
   s_cam.SetModelViewMatrix(om);
 
@@ -54,13 +57,16 @@ void Viewer::Run() {
 
     // draw map
     DrawMapPoints();
-//    DrawAxis();
+    //    DrawAxis();
 
     if (menu_draw_estimate_pose)
       DrawEstimatePose();
 
     if (menu_draw_groundtruth_pose)
       DrawGroundTruthPose();
+
+    if (menu_draw_initial_pose)
+      DrawInitialPose();
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     pangolin::FinishFrame();
@@ -101,6 +107,11 @@ void Viewer::SetGroundTruthPose(const Mat44t &pose) {
 void Viewer::SetEstimatePose(const Mat44t &pose) {
   std::lock_guard<std::mutex> lock(mutex_pose_);
   estimated_pose_ = pose;
+}
+
+void Viewer::SetInitialPose(const Mat44t &pose) {
+  std::lock_guard<std::mutex> lock(mutex_pose_);
+  initial_pose_ = pose;
 }
 
 void Viewer::DrawAxis() {
@@ -157,6 +168,19 @@ void Viewer::DrawEstimatePose() {
   glPushMatrix();
   glMultMatrixd(twc.data());
   DrawCameraWireframe(0, 1, 0);
+  glPopMatrix();
+}
+
+void Viewer::DrawInitialPose() {
+  Mat44t tcw;
+  {
+    std::unique_lock<std::mutex> lock(mutex_pose_);
+    tcw = initial_pose_;
+  }
+  Mat44t twc = tcw.inverse();
+  glPushMatrix();
+  glMultMatrixd(twc.data());
+  DrawCameraWireframe(0, 0, 1);
   glPopMatrix();
 }
 

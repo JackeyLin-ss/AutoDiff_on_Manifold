@@ -48,6 +48,8 @@ public:
 
   void SetEstimatePose(const Mat44t &pose);
 
+  void SetInitialPose(const Mat44t &pose);
+
 private:
   void DrawAxis();
 
@@ -57,12 +59,15 @@ private:
 
   void DrawEstimatePose();
 
+  void DrawInitialPose();
+
   void DrawCameraWireframe(float r, float g, float b);
 
 private:
   std::mutex mutex_pose_;
   Mat44t ground_truth_pose_;
   Mat44t estimated_pose_;
+  Mat44t initial_pose_;
 
   std::vector<Vec3_t> points_;
   std::vector<Vec3_t> colors_;
