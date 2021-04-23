@@ -8,19 +8,22 @@ Here we use two methods (Analytic Derivatives / Automatic Derivatives ) to solve
 
 
 ## 0. Experiment Data 
-  I use real data from **Euroc** to compare different methods.
-  ![euroc dataset map points ](images/Euroc_dataset.png)
+  I use real data from **Euroc** to compare different two methods.
+
+![image-20210503003345813](images/Euroc_dataset.png)
+
+red : ground truth pose, green : estimated pose, blue : initial pose
 
 
 ## 1.Analytic Derivatives
- 
+
 ## 2.Automatic Derivatives
 
 
 ## 3.Prerequisites
   ### Ceres Solver 
-  Ceres solver (Version 1.14.x) is required.  
-  
+  Ceres solver (Version 1.14.x and 2.0 have been tested) is required.  
+
   ### Pangolin
   We use [Pangolin](https://github.com/stevenlovegrove/Pangolin) for visualization and user interface. Dowload and install instructions can be found at: https://github.com/stevenlovegrove/Pangolin.
 
@@ -31,9 +34,11 @@ Here we use two methods (Analytic Derivatives / Automatic Derivatives ) to solve
 ## 4.Build and Run 
 I provide a script `run.sh` in the project directory for you to build and run the code. 
 
-
 ## 5. Result 
 
+### 5.1 Result of auto-diff optimization 
 
-  
+![image-20210502161150910](images/auto_diff.png)
+
+### 5.2 
 

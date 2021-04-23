@@ -1,20 +1,19 @@
 #pragma once
 
-#include "colordef.h"
 #include <chrono>
 #include <iostream>
 #include <string>
+#include "colordef.h"
 
 class Timer {
-public:
+ public:
   void Tic() {
     start_ticking_ = true;
     start_ = std::chrono::high_resolution_clock::now();
   }
 
   double Toc(const std::string &desc = "") {
-    if (!start_ticking_)
-      return 0;
+    if (!start_ticking_) return 0;
     start_ticking_ = false;
     end_ = std::chrono::high_resolution_clock::now();
     double t = std::chrono::duration<double, std::milli>(end_ - start_).count();
@@ -28,7 +27,7 @@ public:
     return t;
   }
 
-private:
+ private:
   bool start_ticking_ = false;
   std::chrono::time_point<std::chrono::high_resolution_clock> start_;
   std::chrono::time_point<std::chrono::high_resolution_clock> end_;
