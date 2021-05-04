@@ -1,149 +1,17 @@
 #include <ceres/ceres.h>
-#include <ceres/rotation.h>
 #include <Eigen/Dense>
 #include <fstream>
 #include <string>
 #include <thread>
+#include "pose_estimator.h"
+#include "re_projection_error.h"
 #include "timer.h"
+#include "type.h"
 #include "viewer/viewer.h"
-
-double fx = 458.65399169921875;
-double fy = 457.29598999023438;
-double cx = 367.21499633789062;
-double cy = 248.375;
-
-using Vec6d = Eigen::Matrix<double, 6, 1>;
-using Vec2d = Eigen::Vector2d;
-using Vec3d = Eigen::Vector3d;
-class PoseEstimationProblem {
- public:
-  PoseEstimationProblem() {
-    num_parameters_ = 6;  // rotation  3dof  translation 3dof
-  }
-  ~PoseEstimationProblem() { delete[] parameters_; }
-
-  int num_observations() const { return num_observations_; }
-
-  Vec2d observation(int i) const { return observations_[i]; }
-
-  double *mutable_camera_pose() { return parameters_; }
-
-  Vec3d point_position_for_observation(int i) const { return points_[i]; }
-
-  bool setInitialParameter(const double *const data) {
-    memcpy(parameters_, data,
-           sizeof(double) * static_cast<unsigned long>(num_parameters_));
-    return true;
-  }
-
-  bool loadFile(const std::string &filename) {
-    std::ifstream fin;
-    fin.open(filename);
-    if (!fin.is_open()) {
-      std::cout << kColorRed << " open file " << filename << " not found "
-                << kColorReset << std::endl;
-      return false;
-    }
-
-    std::string line;
-    std::getline(fin, line);
-    sscanf(line.c_str(), " %d ", &num_observations_);
-
-    num_points_ = num_observations_;
-    num_parameters_ = 6;
-    points_.resize(num_points_);
-    parameters_ = new double[num_parameters_];
-
-    observations_.resize(num_observations_);
-
-    for (int i = 0; i < num_observations(); ++i) {
-      // 3d point
-      std::getline(fin, line);
-      double x, y, z;
-      sscanf(line.c_str(), "%lf %lf %lf", &x, &y, &z);
-      points_[i] = Vec3d(x, y, z);
-
-      // 2d feature points;
-      std::getline(fin, line);
-      double u, v;
-      sscanf(line.c_str(), "%lf %lf", &u, &v);
-      observations_[i] = Vec2d(u, v);
-    }
-
-    fin.close();
-    return true;
-  }
-
- private:
-  // points' position is fixed
-  int num_points_;
-  int num_observations_;
-  int num_parameters_;
-
-  std::vector<Vec2d> observations_;
-  std::vector<Vec3d> points_;
-  double *parameters_;
-};
-
-// reprojection cost function
-
-struct ReprojectionError {
-  ReprojectionError(double observed_x, double observed_y, double px, double py,
-                    double pz)
-      : px_(px),
-        py_(py),
-        pz_(pz),
-        observed_x_(observed_x),
-        observed_y_(observed_y) {}
-
-  template <typename T>
-  bool operator()(const T *const camera, T *residuals) const {
-    // camera[0,1,2] are the angle-axis rotation.
-    T p[3];
-    T point[3] = {T(px_), T(py_), T(pz_)};
-
-    ceres::AngleAxisRotatePoint(camera, point, p);
-
-    // camera[3,4,5] are the translation.
-    p[0] += camera[3];
-    p[1] += camera[4];
-    p[2] += camera[5];
-
-    // Compute the center of distortion. The sign change comes from
-    // the camera model that Noah Snavely's Bundler assumes, whereby
-    // the camera coordinate system has a negative z axis.
-    T xp = p[0] / p[2];
-    T yp = p[1] / p[2];
-
-    T predicted_x = xp * fx + cx;
-    T predicted_y = yp * fy + cy;
-
-    // The error is the difference between the predicted and observed position.
-    residuals[0] = predicted_x - observed_x_;
-    residuals[1] = predicted_y - observed_y_;
-
-    return true;
-  }
-
-  // Factory to hide the construction of the CostFunction object from
-  // the client code.
-  static ceres::CostFunction *create(const double observed_x_,
-                                     const double observed_y_, const double px,
-                                     const double py, const double pz) {
-    return (new ceres::AutoDiffCostFunction<ReprojectionError, 2, 6>(
-        new ReprojectionError(observed_x_, observed_y_, px, py, pz)));
-  }
-
-  double px_;
-  double py_;
-  double pz_;
-
-  double observed_x_;
-  double observed_y_;
-};
 
 using ceres::Problem;
 using ceres::AutoDiffCostFunction;
+using ceres::SizedCostFunction;
 
 Vec6d isoMat2Vector(const Eigen::Matrix4d pose) {
   Eigen::Matrix3d rotation = pose.block(0, 0, 3, 3);
@@ -185,11 +53,16 @@ int main(int argc, char **argv) {
     std::cout << " args error " << std::endl;
     return 1;
   }
+  bool use_analytic = false;
+
+  std::cout << kColorGreen << (use_analytic ? " Use Analytic Derivatives "
+                                            : " Use Automatic Derivatives")
+            << kColorReset << std::endl;
 
   std::string str_map_points = std::string(argv[1]);
   std::string str_observation = std::string(argv[2]);
 
-  Mat44t ground_truth_pose;
+  Mat44d ground_truth_pose;
   ground_truth_pose << -0.38773203, -0.29730779, 0.872509, -1.8075688,
       0.29847804, 0.85506284, 0.42400289, 0.0065075331, -0.87210935, 0.42482427,
       -0.24279539, 0.75284511, 0, 0, 0, 1;
@@ -216,13 +89,38 @@ int main(int argc, char **argv) {
   pose_estimation->setInitialParameter(init_parameter.data());
 
   ceres::Problem problem;
+
+  // camera intrinsic parameters
+  double fx = 458.65399169921875;
+  double fy = 457.29598999023438;
+  double cx = 367.21499633789062;
+  double cy = 248.375;
+  CameraInt cam_int(fx, fy, cx, cy);
+
+  if (use_analytic) {
+    problem.AddParameterBlock(pose_estimation->mutable_camera_pose(), 6,
+                              new PoseSE3Parameterization());
+  } else {
+    problem.AddParameterBlock(pose_estimation->mutable_camera_pose(), 6);
+  }
   for (int i = 0; i < pose_estimation->num_observations(); ++i) {
     auto point = pose_estimation->point_position_for_observation(i);
     auto observation = pose_estimation->observation(i);
-    ceres::CostFunction *cost_function = ReprojectionError::create(
-        observation.x(), observation.y(), point[0], point[1], point[2]);
-    problem.AddResidualBlock(cost_function, nullptr /* squared loss */,
-                             pose_estimation->mutable_camera_pose());
+
+    if (use_analytic) {
+      ceres::CostFunction *cost_function =
+          new ReprojectionErrorSE3(cam_int, observation.x(), observation.y(),
+                                   point.x(), point.y(), point.z());
+      problem.AddResidualBlock(cost_function, NULL,
+                               pose_estimation->mutable_camera_pose());
+    } else  // auto-diff
+    {
+      ceres::CostFunction *cost_function =
+          ReprojectionError::create(cam_int, observation.x(), observation.y(),
+                                    point[0], point[1], point[2]);
+      problem.AddResidualBlock(cost_function, nullptr /* squared loss */,
+                               pose_estimation->mutable_camera_pose());
+    }
   }
 
   ceres::Solver::Options options;
