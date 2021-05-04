@@ -2,8 +2,8 @@
 #include <fstream>
 #include <thread>
 Viewer::Viewer() {
-  estimated_pose_ = Mat44t::Identity();
-  ground_truth_pose_ = Mat44t::Identity();
+  estimated_pose_ = Mat44d::Identity();
+  ground_truth_pose_ = Mat44d::Identity();
 }
 
 Viewer::~Viewer() {}
@@ -86,25 +86,24 @@ void Viewer::LoadMappoints(const std::string &files) {
     std::getline(fin, line);
     float x, y, z;
     sscanf(line.c_str(), "%f %f %f", &x, &y, &z);
-    points_.push_back(Vec3_t(x, y, z));
+    points_.push_back(Vec3d(x, y, z));
     auto color = MakeJet3B((y + 2) / 4.);
-    colors_.push_back(
-        Vec3_t(color[0] / 255., color[1] / 255., color[2] / 255.));
+    colors_.push_back(Vec3d(color[0] / 255., color[1] / 255., color[2] / 255.));
   }
   fin.close();
 }
 
-void Viewer::SetGroundTruthPose(const Mat44t &pose) {
+void Viewer::SetGroundTruthPose(const Mat44d &pose) {
   std::lock_guard<std::mutex> lock(mutex_pose_);
   ground_truth_pose_ = pose;
 }
 
-void Viewer::SetEstimatePose(const Mat44t &pose) {
+void Viewer::SetEstimatePose(const Mat44d &pose) {
   std::lock_guard<std::mutex> lock(mutex_pose_);
   estimated_pose_ = pose;
 }
 
-void Viewer::SetInitialPose(const Mat44t &pose) {
+void Viewer::SetInitialPose(const Mat44d &pose) {
   std::lock_guard<std::mutex> lock(mutex_pose_);
   initial_pose_ = pose;
 }
@@ -139,12 +138,12 @@ void Viewer::DrawMapPoints() {
 }
 
 void Viewer::DrawGroundTruthPose() {
-  Mat44t tcw;
+  Mat44d tcw;
   {
     std::unique_lock<std::mutex> lock(mutex_pose_);
     tcw = ground_truth_pose_;
   }
-  Mat44t twc = tcw.inverse();
+  Mat44d twc = tcw.inverse();
   glPushMatrix();
   glMultMatrixd(twc.data());
   DrawCameraWireframe(1, 0, 0);
@@ -152,12 +151,12 @@ void Viewer::DrawGroundTruthPose() {
 }
 
 void Viewer::DrawEstimatePose() {
-  Mat44t tcw;
+  Mat44d tcw;
   {
     std::unique_lock<std::mutex> lock(mutex_pose_);
     tcw = estimated_pose_;
   }
-  Mat44t twc = tcw.inverse();
+  Mat44d twc = tcw.inverse();
   glPushMatrix();
   glMultMatrixd(twc.data());
   DrawCameraWireframe(0, 1, 0);
@@ -165,12 +164,12 @@ void Viewer::DrawEstimatePose() {
 }
 
 void Viewer::DrawInitialPose() {
-  Mat44t tcw;
+  Mat44d tcw;
   {
     std::unique_lock<std::mutex> lock(mutex_pose_);
     tcw = initial_pose_;
   }
-  Mat44t twc = tcw.inverse();
+  Mat44d twc = tcw.inverse();
   glPushMatrix();
   glMultMatrixd(twc.data());
   DrawCameraWireframe(0, 0, 1);
