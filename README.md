@@ -22,7 +22,7 @@ Automatic Derivatives is a powerful feature in ceres solver, which allows you to
 
 ## 3.Prerequisites
   ### Ceres Solver 
-  Ceres solver (Version 1.14.x and 2.0 have been tested) is required.  
+  Ceres solver (Version 1.14.x) is required.  
   ### Pangolin
   We use [Pangolin](https://github.com/stevenlovegrove/Pangolin) for visualization and user interface. Dowload and install instructions can be found at: https://github.com/stevenlovegrove/Pangolin.
 

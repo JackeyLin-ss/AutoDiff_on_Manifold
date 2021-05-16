@@ -3,8 +3,8 @@ project(auto_diff_on_manifold VERSION 0.1.0)
 
 
 set(CMAKE_BUILD_TYPE Release )
-set(CMAKE_CXX_FLAGS "-std=c++11 -Wall -g -mavx")
-set(CMAKE_CXX_FLAGS_RELEASE "-std=c++11 -O3 -pthread")
+set(CMAKE_CXX_FLAGS "-std=c++14 -Wall -g -mavx")
+set(CMAKE_CXX_FLAGS_RELEASE "-std=c++14 -O3 -pthread")
 
 
 ### Packages 

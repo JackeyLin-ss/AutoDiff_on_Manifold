@@ -3,6 +3,7 @@
 #include <fstream>
 #include <string>
 #include <thread>
+#include <random>
 #include "pose_estimator.h"
 #include "re_projection_error.h"
 #include "timer.h"
